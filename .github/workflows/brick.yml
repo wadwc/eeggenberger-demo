@@ -1,0 +1,39 @@
+name: brick
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  ai:
+    permissions:
+      issues: write
+    runs-on: ubuntu-latest
+    env:
+      PAYLOAD: ${{ toJson(github) }}
+    steps:
+
+      - name: Compress Body
+        id: replace-newlines
+        run: |
+          echo "BODY=$(echo "${{ github.event.issue.body }}" | tr '\r\n' ' ')" >> "$GITHUB_ENV"   
+   
+      - uses: builtwithai/askgpt@main
+        id: generate-response
+        env:
+          KEY: ${{ secrets.KEY }}
+          ENDPOINT: ${{ secrets.ENDPOINT }}
+          MODEL: ${{ secrets.MODEL }}
+          TITLE: ${{ github.event.issue.title }}
+        with:
+          prompt: '{"prompt": ["${TITLE} ${{ env.BODY }}, respond in pretty markdown format and use relevant emojis to express yourself."]}'
+      - env:
+          RESPONSE: ${{ steps.generate-response.outputs.response }}
+        run: echo ok
+
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@23ff15729ef2fc348714a3bb66d2f655ca9066f2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ${{ steps.generate-response.outputs.response }}
